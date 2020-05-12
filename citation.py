@@ -18,14 +18,15 @@ scholarly.scholarly.use_proxy(**proxies)
 # MC - machine comphrehension
 # MT - machine translation
 
-all_tags = ["ML", "RL", "CF", "transfer learning",
+all_tags = ["ML", "RL", "CF", "meta learning", "transfer learning",
             "multi-task", "continual learning",
             "logic", "transformer", "multi agent",
             "game theory", "regret minimization",
             "relational reasoning", "QA", "inductive learning", "symbolic",
             "CV", "image captioning", "NLP", "ASR", "SLU",
             "sentence pair modeling", "STS", "paraphrase identification",
-            "NLI", "MC", "interpretability", "explainability", "MT", "IR", "XAI"]
+            "NLI", "MC", "MT", "IR", "XAI",
+            "genetic programming", "VQA", "LM"]
 
 
 def slow_down(i):
@@ -51,17 +52,23 @@ class publication_query(object):
 
 
 class publication(object):
-    def __init__(self, pub, read=False):
+    def __init__(self, pub, read=False, notes=None, tags=None):
         self.bib = pub.bib
         self.cited_by = []
         self.cites_to = []
-        self.tags = []
+        self.read = read
+        if tags:
+            self.tags = tags
+        else:
+            self.tags = []
+        if notes:
+            self.notes = notes
+        else:
+            self.notes = ""
         try:
             self.ID = pub.id_scholarcitedby
         except:
             self.ID = pub.url_scholarbib
-        self.notes = []
-        self.read = read
         citedby = pub.get_citedby()
         # for c in tqdm(citedby, total=pub.citedby):
         #     time.sleep(30)
@@ -82,6 +89,11 @@ class publication(object):
 
     def set_read(self, read):
         self.read = read
+
+    def has_tag(self, tag):
+        if tag in self.tags:
+            return True
+        return False
 
 
 class citation_DB(object):
@@ -120,6 +132,36 @@ class citation_DB(object):
                     paper['title']))
             print()
 
+    def view_citation_network_with_tag(self, tag):
+
+        print("Papers tagged with {}".format(tag))
+        for ID, paper in self.citations.items():
+            paper_has_tag = False
+            if paper['publication'].has_tag(tag):
+                paper_has_tag = True
+
+            cites_to = []
+            citation_has_tag = False
+            for c in paper['publication'].cites_to:
+                if paper_has_tag:
+                    cites_to.append(
+                        [self.citations[c]['title'], self.citations[c]['publication'].tags])
+                else:
+                    if self.citations[c]['publication'].has_tag(tag):
+                        citation_has_tag = True
+                        cites_to.append(
+                            [self.citations[c]['title'], self.citations[c]['publication'].tags])
+
+            print(paper['title'])
+            print(paper_has_tag)
+            if paper_has_tag:
+                print("{}\n\thas tags: {}".format(paper['publication'].tags))
+            elif citation_has_tag:
+                for title, tags in cites_to:
+                    print("\t--->{} has tags: {}".format(title, tags))
+            if paper_has_tag or citation_has_tag:
+                print()
+
     def view_all_citations(self):
         for paper in self.citations.values():
             print(paper['title'])
@@ -151,6 +193,11 @@ def view_DB_citation_network(load_path="citation_DB.pkl"):
     DB.view_citation_network()
 
 
+def view_DB_citation_network_with_tag(tag, load_path="citation_DB.pkl"):
+    DB = load_DB(load_path)
+    DB.view_citation_network_with_tag(tag)
+
+
 def add_publication_from_GS(query, DB_path="citation_DB.pkl", tags=None, notes=None, read=False):
     DB = load_DB(DB_path)
 
@@ -167,8 +214,8 @@ def add_publication_from_GS(query, DB_path="citation_DB.pkl", tags=None, notes=N
         slow_down(10)
 
     slow_down(10)
-    pub = publication(res, read=read)
+    pub = publication(res, read=read, notes=notes, tags=tags)
     slow_down(10)
     DB.add_publication(pub)
     save_DB(DB, save_path=DB_path)
-    slow_down(1800)
+    slow_down(1200+(len(pub.cited_by)//2))
